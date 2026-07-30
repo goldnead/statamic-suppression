@@ -40,6 +40,34 @@ it('refuses a second row for the same address in the same scope', function (): v
     expect(DB::table('suppressions')->where('email_normalized', 'dead@example.test')->count())->toBe(1);
 });
 
+it('refuses a second global row even when the writer never named a brand', function (): void {
+    // The realistic shape of the trap, and the reason the column carries a
+    // DEFAULT rather than only a NOT NULL. A writer that omits `brand_id`
+    // entirely — a raw backfill, a provider import, a host's own script — has
+    // to land on 0 and collide with the row already there. Left nullable, both
+    // of these would be NULL, MySQL would treat the two NULLs as distinct, and
+    // the table would hold the same fact twice with nothing to say which one
+    // the gate should believe.
+    $row = [
+        'uuid' => (string) Str::uuid(),
+        'email_normalized' => 'unnamed-brand@example.test',
+        'reason' => 'provider_import',
+        'suppressed_at' => now(),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ];
+
+    DB::table('suppressions')->insert($row);
+
+    expect((int) DB::table('suppressions')->where('email_normalized', 'unnamed-brand@example.test')->value('brand_id'))
+        ->toBe(0);
+
+    expect(fn () => DB::table('suppressions')->insert([...$row, 'uuid' => (string) Str::uuid()]))
+        ->toThrow(QueryException::class);
+
+    expect(DB::table('suppressions')->where('email_normalized', 'unnamed-brand@example.test')->count())->toBe(1);
+});
+
 it('still allows the same address in a different scope', function (): void {
     $base = [
         'email_normalized' => 'both@example.test',
