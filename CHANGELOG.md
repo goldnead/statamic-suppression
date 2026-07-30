@@ -98,7 +98,7 @@ not bite at all, and only the write settles it.
 
 ### Notes
 
-- Suite: **44 passed (160 assertions)** on SQLite. `phpunit.mysql.xml` runs the identical suite
+- Suite: **45 passed (163 assertions)** on SQLite. `phpunit.mysql.xml` runs the identical suite
   against a real server, which matters more here than in most siblings because two guarantees are
   index behaviours SQLite cannot express.
 - `tests/Migrations/` runs the migrations against tables that already hold rows, seeding a fresh
