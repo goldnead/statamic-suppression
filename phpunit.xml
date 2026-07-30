@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="./vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="vendor/autoload.php"
+         colors="true"
+         failOnWarning="true"
+         failOnRisky="true"
+         cacheDirectory=".phpunit.cache">
+    <testsuites>
+        <testsuite name="Unit">
+            <directory>tests/Unit</directory>
+        </testsuite>
+        <testsuite name="Feature">
+            <directory>tests/Feature</directory>
+        </testsuite>
+        <!--
+            The migration path itself, against tables that already hold rows.
+            Every other suite meets a database RefreshDatabase has migrated to
+            head; these put data in and migrate forward one file at a time.
+            Present in both configurations on purpose — a unique that
+            constrains nothing and one that constrains too much look identical
+            on SQLite, and this package's correctness rests on one unique that
+            must bite and another that must not.
+        -->
+        <testsuite name="Migrations">
+            <directory>tests/Migrations</directory>
+        </testsuite>
+    </testsuites>
+    <source>
+        <include>
+            <directory>src</directory>
+        </include>
+    </source>
+    <php>
+        <env name="APP_ENV" value="testing"/>
+        <env name="DB_CONNECTION" value="testing"/>
+        <env name="QUEUE_CONNECTION" value="sync"/>
+        <env name="BRAND_CONTEXT_MULTI_BRAND" value="false"/>
+    </php>
+</phpunit>

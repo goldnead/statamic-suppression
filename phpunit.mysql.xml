@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    The same suite, against a real MySQL server.
+
+        vendor/bin/pest -c phpunit.mysql.xml
+
+    It matters more here than in most siblings. Two of this package's guarantees
+    are index behaviours SQLite does not express the way InnoDB does: the unique
+    over a NOT NULL `brand_id` that must refuse a second global row, and the
+    unique over a nullable `dedupe_key` that must accept any number of manual
+    events. A green SQLite run says both are plausible; only this one says they
+    hold on the engine the hosts run.
+
+    Point DB_HOST/DB_PORT/DB_DATABASE/DB_USERNAME/DB_PASSWORD at a throwaway
+    database; the suite migrates it from scratch on every run.
+
+    IndexKeyLengthTest measures the key arithmetic without a server, so CI does
+    not depend on this file. It exists for the run that proves the compiled DDL
+    and the real engine agree.
+-->
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="./vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="vendor/autoload.php"
+         colors="true"
+         cacheDirectory=".phpunit.mysql.cache">
+    <testsuites>
+        <testsuite name="Unit">
+            <directory>tests/Unit</directory>
+        </testsuite>
+        <testsuite name="Feature">
+            <directory>tests/Feature</directory>
+        </testsuite>
+        <testsuite name="Migrations">
+            <directory>tests/Migrations</directory>
+        </testsuite>
+    </testsuites>
+    <source>
+        <include>
+            <directory>src</directory>
+        </include>
+    </source>
+    <php>
+        <env name="APP_ENV" value="testing"/>
+        <env name="DB_CONNECTION" value="testing"/>
+        <env name="DB_DRIVER" value="mysql"/>
+        <env name="DB_HOST" value="127.0.0.1"/>
+        <env name="DB_PORT" value="3306"/>
+        <env name="DB_DATABASE" value="suppression_test"/>
+        <env name="DB_USERNAME" value="root"/>
+        <env name="DB_PASSWORD" value=""/>
+        <env name="QUEUE_CONNECTION" value="sync"/>
+    </php>
+</phpunit>

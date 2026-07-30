@@ -1,0 +1,86 @@
+{
+    "name": "goldnead/statamic-suppression",
+    "description": "The authoritative answer to \"may we send to this address at all?\" — a global, brand-aware suppression layer shared by every addon that sends mail.",
+    "type": "statamic-addon",
+    "license": "MIT",
+    "keywords": [
+        "statamic",
+        "statamic-addon",
+        "suppression",
+        "deliverability",
+        "bounce",
+        "complaint",
+        "foundation"
+    ],
+    "authors": [
+        {
+            "name": "Adrian Goldner",
+            "email": "info@adriangoldner.com"
+        }
+    ],
+    "support": {
+        "issues": "https://github.com/goldnead/statamic-suppression/issues",
+        "source": "https://github.com/goldnead/statamic-suppression"
+    },
+    "repositories": [
+        {
+            "type": "vcs",
+            "url": "https://github.com/goldnead/statamic-brand-context.git"
+        }
+    ],
+    "require": {
+        "php": "^8.2",
+        "goldnead/statamic-brand-context": "^1.4",
+        "laravel/framework": "^11.0|^12.0|^13.0"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^8.0|^9.0|^10.0|^11.0",
+        "pestphp/pest": "^2.0|^3.0|^4.0",
+        "pestphp/pest-plugin-laravel": "^2.0|^3.0|^4.0"
+    },
+    "suggest": {
+        "statamic/cms": "Required only when the host application is a Statamic site.",
+        "goldnead/statamic-marketing": "Feeds the tables from ESP webhooks and surfaces them in the Control Panel."
+    },
+    "autoload": {
+        "psr-4": {
+            "Goldnead\\Suppression\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Goldnead\\Suppression\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "statamic": {
+            "name": "Suppression",
+            "description": "Global, brand-aware suppression: one answer to whether an address may be mailed."
+        },
+        "laravel": {
+            "providers": [
+                "Goldnead\\Suppression\\ServiceProvider"
+            ],
+            "aliases": {
+                "Suppression": "Goldnead\\Suppression\\Facades\\Suppression",
+                "SuppressionGate": "Goldnead\\Suppression\\Facades\\SuppressionGate"
+            }
+        }
+    },
+    "scripts": {
+        "test": [
+            "@php vendor/bin/pest"
+        ]
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true,
+            "pixelfear/composer-dist-plugin": true,
+            "composer/installers": true,
+            "php-http/discovery": true
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
