@@ -1,5 +1,6 @@
 <?php
 
+use Goldnead\Suppression\Contracts\Gate;
 use Goldnead\Suppression\Exceptions\ComplaintReleaseRefused;
 use Goldnead\Suppression\Exceptions\IncompleteAuditTrail;
 use Goldnead\Suppression\Models\Suppression;
@@ -8,7 +9,7 @@ use Goldnead\Suppression\Reasons;
 use Goldnead\Suppression\SuppressionService;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Event;
 
 beforeEach(function (): void {
     $this->service = app(SuppressionService::class);
@@ -99,13 +100,21 @@ it('records who, when and why when the release is complete', function (): void {
 /**
  * The transactional guarantee. A release that cannot be logged must not happen
  * — that is the whole condition, not a detail of it.
+ *
+ * The write is broken from inside the insert rather than by dropping the table.
+ * DDL is not portable here: under `RefreshDatabase` on MySQL a `DROP TABLE`
+ * implicitly commits the surrounding test transaction, so the rollback this
+ * test exists to prove could no longer happen and the failure surfaced as a
+ * bare PDOException. That made the assertion pass on SQLite and fail on the
+ * engine the hosts actually run — which is exactly the class of difference
+ * `phpunit.mysql.xml` was written to catch.
  */
 it('rolls the release back when the audit event cannot be written', function (): void {
     $this->service->suppress('objector@example.test', Reasons::COMPLAINT);
 
-    // The log is gone, so the event insert fails. If the state change survives
-    // that, the address is mailable again with no record of the decision.
-    Schema::drop('suppression_events');
+    Event::listen('eloquent.creating: '.SuppressionEvent::class, function (): void {
+        throw new QueryException('testing', 'insert into suppression_events', [], new RuntimeException('the log is unavailable'));
+    });
 
     expect(fn () => $this->service->releaseComplaint(
         'objector@example.test',
@@ -152,7 +161,7 @@ it('keeps the release in the log when the address is blocked again', function ()
     $row = Suppression::query()->where('email_normalized', 'objector@example.test')->sole();
 
     expect($row->released_at)->toBeNull('the row is active again')
-        ->and(app(\Goldnead\Suppression\Contracts\Gate::class)->isSuppressed('objector@example.test'))->toBeTrue();
+        ->and(app(Gate::class)->isSuppressed('objector@example.test'))->toBeTrue();
 });
 
 it('will not let anything edit or delete an audit event', function (): void {
