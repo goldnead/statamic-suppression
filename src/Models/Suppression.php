@@ -5,6 +5,7 @@ namespace Goldnead\Suppression\Models;
 use Goldnead\Suppression\Reasons;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
 /**
@@ -23,6 +24,28 @@ use Illuminate\Support\Str;
  *
  * A future agent "fixing" this model to use `HasBrand` for consistency would
  * reintroduce both bugs. `tests/Feature/CrossBrandTest.php` is what stops that.
+ *
+ * The `@property` block below is the schema of `suppressions`, restated for
+ * static analysis. It is part of the public surface: the facade hands these
+ * instances to consumers, so a column rename here is a breaking change.
+ *
+ * @property int $id
+ * @property string $uuid
+ * @property int $brand_id 0 means every brand
+ * @property string $email_normalized
+ * @property string $reason one of Reasons::all()
+ * @property string|null $source
+ * @property string|null $provider_message_id
+ * @property string|null $message_uuid
+ * @property Carbon $suppressed_at
+ * @property Carbon|null $expires_at null means permanent
+ * @property Carbon|null $released_at
+ * @property string|null $released_by
+ * @property string|null $release_reason
+ * @property string|null $notes
+ * @property array<string, mixed>|null $meta
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  */
 class Suppression extends Model
 {

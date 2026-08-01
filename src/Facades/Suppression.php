@@ -2,6 +2,7 @@
 
 namespace Goldnead\Suppression\Facades;
 
+use Goldnead\Suppression\SuppressionService;
 use Illuminate\Support\Facades\Facade;
 
 /**
@@ -14,7 +15,7 @@ use Illuminate\Support\Facades\Facade;
  * @method static \Illuminate\Support\Collection historyFor(string $email, ?int $brandId = null)
  * @method static int brandIdFor(string $reason, ?int $brandId = null)
  *
- * @see \Goldnead\Suppression\SuppressionService
+ * @see SuppressionService
  */
 class Suppression extends Facade
 {

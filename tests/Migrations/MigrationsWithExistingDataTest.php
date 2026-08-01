@@ -1,6 +1,7 @@
 <?php
 
 use Goldnead\Suppression\Tests\Fixtures\SuppressionDataFixture;
+use Illuminate\Support\Str;
 
 /**
  * The migrations, run against a database that already holds data.
@@ -88,7 +89,7 @@ it('accepts many audit events with no dedupe key on a populated table', function
     expect($unkeyed)->toBe(2);
 
     $this->isolated()->table('suppression_events')->insert([
-        'uuid' => (string) Illuminate\Support\Str::uuid(),
+        'uuid' => (string) Str::uuid(),
         'brand_id' => 1,
         'email_normalized' => 'released@example.test',
         'event_type' => 'released',

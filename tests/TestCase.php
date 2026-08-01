@@ -2,7 +2,10 @@
 
 namespace Goldnead\Suppression\Tests;
 
+use Goldnead\BrandContext\Facades\BrandContext;
 use Goldnead\BrandContext\Models\Brand;
+use Goldnead\Suppression\Facades\Suppression;
+use Goldnead\Suppression\Facades\SuppressionGate;
 use Goldnead\Suppression\ServiceProvider;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Orchestra\Testbench\TestCase as Orchestra;
@@ -22,9 +25,9 @@ abstract class TestCase extends Orchestra
     protected function getPackageAliases($app): array
     {
         return [
-            'BrandContext' => \Goldnead\BrandContext\Facades\BrandContext::class,
-            'Suppression' => \Goldnead\Suppression\Facades\Suppression::class,
-            'SuppressionGate' => \Goldnead\Suppression\Facades\SuppressionGate::class,
+            'BrandContext' => BrandContext::class,
+            'Suppression' => Suppression::class,
+            'SuppressionGate' => SuppressionGate::class,
         ];
     }
 
@@ -33,7 +36,7 @@ abstract class TestCase extends Orchestra
         $app['config']->set('app.key', 'base64:'.base64_encode(random_bytes(32)));
 
         $app['config']->set('database.default', 'testing');
-        $app['config']->set('database.connections.testing', $this->testingConnection());
+        $app['config']->set('database.connections.testing', $this->connectionUnderTest());
 
         // Default to single-brand; the cross-brand tests flip it on. The
         // suppression tables are not brand-scoped by Eloquent at all, so this
@@ -54,8 +57,13 @@ abstract class TestCase extends Orchestra
      * a NOT NULL `brand_id` that must bite, and a unique over a nullable
      * `dedupe_key` that must not. `tests/Unit/IndexKeyLengthTest.php` measures
      * the compiled DDL without a server; this measures the engine.
+     *
+     * Not named `testingConnection()`: Pint's `php_unit_method_casing` fixer
+     * treats any method whose name starts with `test` as a PHPUnit test case
+     * and snake_cases it, which renamed the declaration and left the call site
+     * behind. The name avoids the prefix rather than disabling the fixer.
      */
-    protected function testingConnection(): array
+    protected function connectionUnderTest(): array
     {
         if (env('DB_DRIVER', 'sqlite') !== 'mysql') {
             return [

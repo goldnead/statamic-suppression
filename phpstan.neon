@@ -1,0 +1,14 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+    - phpstan-baseline.neon
+
+parameters:
+    level: 5
+
+    paths:
+        - src
+
+    # `suppression` and `brand-context` are container bindings, not classes.
+    # Larastan cannot type an `app('...')` string, so the calls that resolve
+    # them stay unresolved rather than being silenced globally.
+    checkModelProperties: false

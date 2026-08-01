@@ -5,6 +5,7 @@ namespace Goldnead\Suppression\Models;
 use Goldnead\Suppression\Reasons;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
 /**
@@ -13,6 +14,28 @@ use Illuminate\Support\Str;
  * Like `Suppression`, this model does not use `HasBrand` — for the same reason,
  * and additionally because an audit log that hides rows depending on who is
  * looking is not an audit log.
+ *
+ * The `@property` block below is the schema of `suppression_events`, restated
+ * for static analysis. It is part of the public surface: `historyFor()` hands
+ * these instances to consumers, so a column rename here is a breaking change.
+ *
+ * @property int $id
+ * @property string $uuid
+ * @property int $brand_id 0 means every brand
+ * @property string $email_normalized
+ * @property string $event_type one of the TYPE_* constants
+ * @property string|null $reason
+ * @property string|null $source
+ * @property string|null $provider
+ * @property string|null $provider_event_id
+ * @property string|null $provider_message_id
+ * @property string|null $message_uuid
+ * @property string|null $actor
+ * @property string|null $dedupe_key
+ * @property array<string, mixed>|null $payload
+ * @property Carbon $occurred_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  */
 class SuppressionEvent extends Model
 {

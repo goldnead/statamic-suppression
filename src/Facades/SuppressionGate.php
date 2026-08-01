@@ -2,13 +2,14 @@
 
 namespace Goldnead\Suppression\Facades;
 
+use Goldnead\Suppression\Contracts\Gate;
 use Illuminate\Support\Facades\Facade;
 
 /**
  * @method static bool isSuppressed(string $email, ?int $brandId = null)
  * @method static array<string, true> suppressedAmong(iterable $emails, ?int $brandId = null)
  *
- * @see \Goldnead\Suppression\Contracts\Gate
+ * @see Gate
  */
 class SuppressionGate extends Facade
 {

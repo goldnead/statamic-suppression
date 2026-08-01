@@ -1,0 +1,6 @@
+# Deliberately empty: level 5 passes with nothing suppressed.
+#
+# If a future change needs an entry here, prefer fixing the code. Regenerating
+# this file to turn a red build green is how a ratchet becomes a rubber stamp.
+parameters:
+    ignoreErrors: []
