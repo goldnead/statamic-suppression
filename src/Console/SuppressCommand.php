@@ -42,6 +42,16 @@ class SuppressCommand extends Command
             return self::FAILURE;
         }
 
+        // `suppress()` answers null when a redelivered provider event was
+        // already recorded and no row is visible in the scope this reason
+        // resolves to. Nothing was written and nothing is wrong — but there is
+        // also nothing to report, and dereferencing it here was a fatal.
+        if (! $suppression) {
+            $this->warn("[{$email}] was already recorded for this event; nothing changed.");
+
+            return self::FAILURE;
+        }
+
         $scope = $suppression->isGlobal()
             ? 'globally (every brand)'
             : 'in brand '.$suppression->brand_id;
