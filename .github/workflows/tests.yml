@@ -7,19 +7,39 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions: {}
+
+env:
+  # goldnead/statamic-brand-context is private, so Composer needs a PAT with
+  # read access configured as the SIBLING_REPOS_TOKEN secret. Once the sibling
+  # is on Packagist this and the `repositories` block in composer.json both go.
+  COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ secrets.SIBLING_REPOS_TOKEN || github.token }}"}}'
+
 jobs:
+  # The suite across the range composer.json actually promises. Laravel 11 is
+  # deliberately absent: every 11.x release carries an unpatched advisory and
+  # statamic/cms (pulled in by brand-context) requires ^12.40 anyway, so a
+  # Laravel 11 leg would test a combination nobody can install.
   pest:
-    name: PHP ${{ matrix.php }}
+    name: PHP ${{ matrix.php }} · Laravel ${{ matrix.laravel }} · ${{ matrix.stability }}
     runs-on: ubuntu-latest
 
     strategy:
       fail-fast: false
       matrix:
         php: ['8.2', '8.3', '8.4']
+        laravel: ['^12.0', '^13.0']
+        stability: [prefer-lowest, prefer-stable]
+        exclude:
+          # Laravel 13 requires PHP 8.3.
+          - php: '8.2'
+            laravel: '^13.0'
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -29,34 +49,90 @@ jobs:
           coverage: none
           tools: composer:v2
 
-      # goldnead/statamic-brand-context is private, so Composer needs a PAT with
-      # read access configured as the SIBLING_REPOS_TOKEN secret.
       - name: Install dependencies
-        env:
-          COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ secrets.SIBLING_REPOS_TOKEN || github.token }}"}}'
-        run: composer update --prefer-dist --no-progress --no-interaction
+        run: |
+          composer require "laravel/framework:${{ matrix.laravel }}" --no-interaction --no-update
+          composer update --${{ matrix.stability }} --prefer-dist --no-progress --no-interaction
 
-      - name: Show installed sibling versions
-        run: composer show | grep -E 'goldnead|statamic/cms|laravel/framework'
+      - name: Show what actually resolved
+        run: composer show | grep -E 'goldnead|statamic/cms|laravel/framework|orchestra/testbench '
 
       - name: Run Pest test suite
         run: vendor/bin/pest --colors=always
 
-  lint:
-    name: lint
+  # The run that proves the two index guarantees on the engine hosts run.
+  # SQLite accepts a second global row and a second NULL dedupe_key for
+  # reasons of its own; only InnoDB answers the question this package asks.
+  mysql:
+    name: MySQL
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: 'yes'
+          MYSQL_DATABASE: suppression_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, pdo_mysql, intl, fileinfo, gd
+          coverage: none
+          tools: composer:v2
+
+      - name: Install dependencies
+        run: composer update --prefer-dist --no-progress --no-interaction
+
+      - name: Run the identical suite against InnoDB
+        run: vendor/bin/pest -c phpunit.mysql.xml --colors=always
+
+  static:
+    name: Style and static analysis
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
-      - uses: shivammathur/setup-php@v2
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
         with:
           php-version: '8.3'
           coverage: none
           tools: composer:v2
 
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      # Check, never fix. Auto-committing style onto a contributor's branch
+      # rewrites their work without asking.
+      - name: Pint
+        run: vendor/bin/pint --test
+
+      - name: PHPStan
+        run: vendor/bin/phpstan analyse --error-format=github --no-progress
+
+      # PHPStan only reads src/. This is what covers tests, config and the
+      # migrations.
       - name: Syntax check
-        run: find src tests config database -name '*.php' -print0 | xargs -0 -n1 -P4 php -l
+        run: find tests config database -name '*.php' -print0 | xargs -0 -n1 -P4 php -l
 
       - name: Validate composer.json
         run: composer validate --no-check-publish
