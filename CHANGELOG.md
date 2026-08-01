@@ -1,7 +1,6 @@
 # Changelog
 
-## Unreleased
-
+## 1.1.0 — 2026-08-01
 ### Major changes
 
 - **Laravel 11 is no longer declared.** `require.laravel/framework` narrows from
