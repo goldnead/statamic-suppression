@@ -18,6 +18,7 @@
             "email": "info@adriangoldner.com"
         }
     ],
+    "homepage": "https://github.com/goldnead/statamic-suppression",
     "support": {
         "issues": "https://github.com/goldnead/statamic-suppression/issues",
         "source": "https://github.com/goldnead/statamic-suppression"
@@ -31,10 +32,12 @@
     "require": {
         "php": "^8.2",
         "goldnead/statamic-brand-context": "^1.4",
-        "laravel/framework": "^11.0|^12.0|^13.0"
+        "laravel/framework": "^12.0|^13.0"
     },
     "require-dev": {
-        "orchestra/testbench": "^8.0|^9.0|^10.0|^11.0",
+        "larastan/larastan": "^3.0",
+        "laravel/pint": "^1.18",
+        "orchestra/testbench": "^10.0|^11.0",
         "pestphp/pest": "^2.0|^3.0|^4.0",
         "pestphp/pest-plugin-laravel": "^2.0|^3.0|^4.0"
     },
@@ -54,8 +57,12 @@
     },
     "extra": {
         "statamic": {
+            "slug": "suppression",
             "name": "Suppression",
-            "description": "Global, brand-aware suppression: one answer to whether an address may be mailed."
+            "description": "Global, brand-aware suppression: one answer to whether an address may be mailed.",
+            "url": "https://github.com/goldnead/statamic-suppression",
+            "developer": "Adrian Goldner",
+            "developer-url": "https://gldnr.studio"
         },
         "laravel": {
             "providers": [
@@ -70,15 +77,25 @@
     "scripts": {
         "test": [
             "@php vendor/bin/pest"
+        ],
+        "test:mysql": [
+            "@php vendor/bin/pest -c phpunit.mysql.xml"
+        ],
+        "lint": [
+            "@php vendor/bin/pint --test"
+        ],
+        "fix": [
+            "@php vendor/bin/pint"
+        ],
+        "analyse": [
+            "@php vendor/bin/phpstan analyse"
         ]
     },
     "config": {
         "sort-packages": true,
         "allow-plugins": {
             "pestphp/pest-plugin": true,
-            "pixelfear/composer-dist-plugin": true,
-            "composer/installers": true,
-            "php-http/discovery": true
+            "pixelfear/composer-dist-plugin": true
         }
     },
     "minimum-stability": "stable",
