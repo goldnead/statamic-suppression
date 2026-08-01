@@ -1,0 +1,10 @@
+{
+    "disable": [
+        "testing.addon-testcase"
+    ],
+    "reasons": {
+        "testing.addon-testcase": "Statamic\\Testing\\AddonTestCase boots the full Statamic stack around the addon under test. This package's defining property is that it boots without Statamic — the provider is a plain Laravel one so the gate answers in a queue worker or a console command (src/ServiceProvider.php). Testing it through Statamic's harness would test an environment the package does not require and would hide the day it accidentally starts needing one. tests/TestCase.php boots Testbench with brand-context and this provider only, and additionally owns the sqlite/mysql connection switch that phpunit.mysql.xml depends on. Revisit if this package ever gains a Control Panel surface.",
+        "release.resolvable-dependencies": "NOT disabled, and must not be. goldnead/statamic-brand-context is still private, so the `repositories` block in composer.json is load-bearing and the finding is accurate. It clears when brand-context is published to Packagist; the block and the COMPOSER_AUTH lines in .github/workflows/tests.yml go at the same time. Recorded here so nobody mistakes it for an oversight.",
+        "bootstrap.addon-service-provider": "INFO, left standing. Extending Illuminate's ServiceProvider instead of AddonServiceProvider is the same decision as above and is argued at src/ServiceProvider.php:11-17."
+    }
+}
