@@ -68,4 +68,24 @@ return [
         'min_reason_length' => (int) env('SUPPRESSION_MIN_REASON_LENGTH', 20),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Insights
+    |--------------------------------------------------------------------------
+    |
+    | Offers two figures — what happened on the list, and how many addresses are
+    | currently on it — to goldnead/statamic-insights, when that addon is
+    | installed. It never is a requirement: this package is a foundation and
+    | must work with nothing else present.
+    |
+    | Off means the figures are not registered at all, which is different from
+    | registering a zero. An installation that has the analytics addon for
+    | something else does not get two tiles it never asked for.
+    |
+    */
+
+    'insights' => [
+        'enabled' => (bool) env('SUPPRESSION_INSIGHTS', true),
+    ],
+
 ];

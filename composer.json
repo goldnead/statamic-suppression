@@ -37,6 +37,7 @@
     },
     "suggest": {
         "statamic/cms": "Required only when the host application is a Statamic site.",
+        "goldnead/statamic-insights": "Shows what happened on the suppression list and how many addresses are on it, on the Insights dashboard.",
         "goldnead/statamic-marketing": "Feeds the tables from ESP webhooks and surfaces them in the Control Panel."
     },
     "autoload": {
