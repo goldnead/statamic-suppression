@@ -661,6 +661,89 @@ class InsightsMetricsTest extends TestCase
         $this->assertSame(['2026-08-19' => 2], (new Events)->series($tag), "and it is in that day's column, not the next one");
     }
 
+    /**
+     * The holding had the same defect, and it did not arrive by inheritance.
+     *
+     * Its neighbour goes through {@see TableMetric::inPeriod()} and was
+     * repaired there. This one cannot: a holding is asked *of an instant*, so
+     * it writes its own comparisons — and they were the inclusive kind. Every
+     * instant it asks about is the end of something, and every one of those is
+     * 23:59:59.999999, so an address blocked in that last fraction was
+     * reported by the event figure and missing from the holding beside it.
+     */
+    #[Test]
+    public function an_address_blocked_in_the_last_fraction_of_the_final_second_is_on_the_list_at_the_close(): void
+    {
+        $this->rawBlock('kurz-vor-zwoelf@example.com', suppressedAt: '2026-08-19 23:59:59.500');
+
+        $tag = new MetricQuery(Period::between(
+            Carbon::parse('2026-08-19')->startOfDay(),
+            Carbon::parse('2026-08-19')->endOfDay(),
+        ));
+
+        $this->assertSame(1, (new Blocked)->value($tag), 'blocked half a second before midnight is blocked at the close of that day');
+        $this->assertSame(['2026-08-19' => 1], (new Blocked)->series($tag), "and the day's column has to agree with the headline");
+    }
+
+    /**
+     * And the same second at the other end: an address that leaves in it has left.
+     *
+     * The mirror of the case above, and the one that reads as an over-count:
+     * compared inclusively, an address released — or a temporary block lapsing
+     * — in the final fraction was still on the list at the close. Two rows,
+     * because the two ways off the list are two separate conditions and a
+     * repair to one is not a repair to the other.
+     */
+    #[Test]
+    public function an_address_leaving_in_the_last_fraction_of_the_final_second_is_off_the_list_at_the_close(): void
+    {
+        $this->rawBlock('freigegeben@example.com', suppressedAt: '2026-08-18 09:00:00', releasedAt: '2026-08-19 23:59:59.500');
+        $this->rawBlock('abgelaufen@example.com', suppressedAt: '2026-08-18 09:00:00', expiresAt: '2026-08-19 23:59:59.500');
+
+        $fenster = new MetricQuery(Period::between(
+            Carbon::parse('2026-08-18')->startOfDay(),
+            Carbon::parse('2026-08-19')->endOfDay(),
+        ));
+
+        $this->assertSame(0, (new Blocked)->value($fenster), 'neither address may still be on the list at the close');
+        $this->assertSame(
+            ['2026-08-18' => 2],
+            (new Blocked)->series($fenster),
+            'both are on the list through the 18th and off it by the end of the 19th, which is a level of zero and therefore no column',
+        );
+    }
+
+    /**
+     * One row written straight to the table, so a sub-second timestamp survives.
+     *
+     * {@see block()} goes through the model, which is the right way to build a
+     * fixture and the wrong way to state these two cases: the `datetime` cast
+     * formats to whole seconds and the fraction would be gone before it reached
+     * the database.
+     */
+    protected function rawBlock(
+        string $email,
+        string $suppressedAt,
+        ?string $expiresAt = null,
+        ?string $releasedAt = null,
+        int $brandId = Reasons::GLOBAL_BRAND_ID,
+    ): void {
+        DB::table('suppressions')->insert([
+            'uuid' => (string) Str::uuid(),
+            'brand_id' => $brandId,
+            'email_normalized' => $email,
+            'reason' => Reasons::HARD_BOUNCE,
+            'source' => 'scaleway',
+            'suppressed_at' => $suppressedAt,
+            'expires_at' => $expiresAt,
+            'released_at' => $releasedAt,
+            'released_by' => $releasedAt === null ? null : 'adrian',
+            'release_reason' => $releasedAt === null ? null : 'Der Empfänger hat sich selbst wieder angemeldet.',
+            'created_at' => $suppressedAt,
+            'updated_at' => $suppressedAt,
+        ]);
+    }
+
     // -- Across brands --------------------------------------------------------
 
     /**

@@ -3,6 +3,7 @@
 namespace Goldnead\Suppression\Integrations\Insights;
 
 use Goldnead\StatamicInsights\Support\MetricQuery;
+use Goldnead\StatamicInsights\Support\Period;
 use Goldnead\StatamicInsights\Support\TableMetric;
 use Goldnead\StatamicInsights\Support\Unit;
 use Goldnead\Suppression\Reasons;
@@ -173,16 +174,45 @@ class Blocked extends SuppressionMetric
     }
 
     /**
+     * The first instant **after** a moment, so nothing is compared inclusively.
+     *
+     * The same device as {@see Period::toExclusive()}, and here for the same
+     * reason. Every moment this class asks about is the
+     * end of something — a bucket's `endOfDay`, a month's `endOfMonth`, the
+     * period's own `to` — and all three are 23:59:59.999999. A query binding
+     * formats a date as `Y-m-d H:i:s` and drops the fraction, so compared with
+     * `<=` against a column that keeps milliseconds, an address blocked at
+     * 23:59:59.500 was not yet on the list at the close of that day, and one
+     * released in that same fraction was still on it. Silently, and only where
+     * the fraction survives.
+     *
+     * Moved to the following midnight there is nothing left to truncate:
+     * `suppressed_at < T'` is exactly `suppressed_at <= T`, and
+     * `released_at >= T'` is exactly `released_at > T`, at every precision.
+     *
+     * The bucket keys are untouched by this: {@see bucketEnds()} still walks
+     * the calendar on the inclusive end, so no column is added or lost — only
+     * the question asked in each one is stated without a boundary that can be
+     * rounded away.
+     */
+    protected function justAfter(Carbon $moment): Carbon
+    {
+        return $moment->copy()->addSecond()->startOfSecond();
+    }
+
+    /**
      * The definition, in one place.
      *
      * Everything else in this class is a way of asking it repeatedly.
      */
     protected function rowsBlockedAt(Carbon $moment): Builder
     {
+        $bis = $this->justAfter($moment);
+
         return DB::table($this->table())
-            ->where('suppressed_at', '<=', $moment)
-            ->where(fn (Builder $rows) => $rows->whereNull('released_at')->orWhere('released_at', '>', $moment))
-            ->where(fn (Builder $rows) => $rows->whereNull('expires_at')->orWhere('expires_at', '>', $moment));
+            ->where('suppressed_at', '<', $bis)
+            ->where(fn (Builder $rows) => $rows->whereNull('released_at')->orWhere('released_at', '>=', $bis))
+            ->where(fn (Builder $rows) => $rows->whereNull('expires_at')->orWhere('expires_at', '>=', $bis));
     }
 
     /** The oldest block on record, for a period that names no start. */
