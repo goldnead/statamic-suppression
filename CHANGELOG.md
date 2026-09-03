@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.2.1 — 2026-09-03
 
 ### Fixed: the last second of a period is inside the "blocked" figure
 
