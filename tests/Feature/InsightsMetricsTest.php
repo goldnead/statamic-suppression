@@ -17,7 +17,6 @@ use Goldnead\Suppression\Reasons;
 use Goldnead\Suppression\Tests\TestCase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\Test;
 
 /**
@@ -607,57 +606,73 @@ class InsightsMetricsTest extends TestCase
         $this->assertSame(3, (new Blocked)->value($alles), 'and e@, blocked until September, is still blocked');
     }
 
-    // -- The last fraction of the last second --------------------------------
+    // -- The last second of the window ---------------------------------------
+    //
+    // These three used to state their case half a second before midnight, which
+    // is the shape the defect actually had. The columns cannot hold it:
+    // `suppressed_at`, `expires_at`, `released_at` and `occurred_at` are all
+    // `timestamp` without a precision, and MySQL *rounds* a written fraction to
+    // the nearest second rather than truncating it — `23:59:59.500` lands on the
+    // following midnight, in the next day, outside the window. SQLite keeps the
+    // string verbatim, so the same fixture meant two different instants on the
+    // two engines and the suite was red on MySQL only.
+    //
+    // So the fixtures were pulled onto `23:59:59`, the last instant these
+    // columns can hold, and what the three tests pin is the last *second* of the
+    // window rather than its last millisecond. That costs the first two their
+    // teeth: at second precision `<= 23:59:59` and `< midnight` select the same
+    // rows, so neither would fail against the old inclusive form. They are kept
+    // because the boundary itself is still worth stating. The third keeps its
+    // teeth in full — see the note there.
+    //
+    // Pinning the sub-second case again would take columns that store fractions
+    // (`timestamp('suppressed_at', 3)`), i.e. a migration against tables that
+    // have shipped. Recorded here rather than done.
+    //
+    // With no fraction left to smuggle past a cast, these fixtures go through
+    // the model helpers like every other test in this file.
 
     /**
-     * An event stamped at 23:59:59.500 on the closing day is inside the period.
+     * An event stamped in the final second of the closing day is in the period.
      *
-     * This is the defect that made these metrics stop writing their own window.
-     * The period's `to` is 23:59:59.999999, a binding formats a date as
-     * `Y-m-d H:i:s` and drops the fraction, and so a `<=` comparison against a
-     * column that keeps milliseconds threw away every row in the final second —
-     * silently, and only where the fraction survives, which is why a green suite
-     * never showed it.
-     * {@see TableMetric::inPeriod()} compares
-     * `< midnight` instead, and midnight is the same instant at every precision.
+     * The defect behind this section is what made these metrics stop writing
+     * their own window. The period's `to` is 23:59:59.999999, a binding formats
+     * a date as `Y-m-d H:i:s` and drops the fraction, and so a `<=` comparison
+     * against a column that keeps milliseconds threw away every row in the final
+     * second — silently, and only where the fraction survives.
+     * {@see TableMetric::inPeriod()} compares `< midnight` instead, and midnight
+     * is the same instant at every precision.
      *
-     * Written straight to the table because the model's `datetime` cast formats
-     * to whole seconds: through it the case cannot be stated at all.
+     * On this table the two forms cannot disagree, so what is left here is the
+     * plain statement that the closing second belongs to the closing day and to
+     * its column — which a bound formatted as `Y-m-d`, or an off-by-one in the
+     * bucketing, would still break.
      */
     #[Test]
-    public function an_event_in_the_last_fraction_of_the_final_second_is_counted(): void
+    public function an_event_in_the_final_second_of_the_period_is_counted(): void
     {
-        DB::table('suppression_events')->insert([
-            [
-                'uuid' => (string) Str::uuid(),
-                'brand_id' => Reasons::GLOBAL_BRAND_ID,
-                'email_normalized' => 'mittag@example.com',
-                'event_type' => SuppressionEvent::TYPE_SUPPRESSED,
-                'reason' => Reasons::HARD_BOUNCE,
-                'source' => 'scaleway',
-                'occurred_at' => '2026-08-19 12:00:00',
-                'created_at' => '2026-08-19 12:00:00',
-                'updated_at' => '2026-08-19 12:00:00',
-            ],
-            [
-                'uuid' => (string) Str::uuid(),
-                'brand_id' => Reasons::GLOBAL_BRAND_ID,
-                'email_normalized' => 'kurz-vor-zwoelf@example.com',
-                'event_type' => SuppressionEvent::TYPE_SUPPRESSED,
-                'reason' => Reasons::HARD_BOUNCE,
-                'source' => 'scaleway',
-                'occurred_at' => '2026-08-19 23:59:59.500',
-                'created_at' => '2026-08-19 23:59:59',
-                'updated_at' => '2026-08-19 23:59:59',
-            ],
-        ]);
+        $this->event(
+            SuppressionEvent::TYPE_SUPPRESSED,
+            '2026-08-19 12:00:00',
+            Reasons::HARD_BOUNCE,
+            'scaleway',
+            'mittag@example.com',
+        );
+
+        $this->event(
+            SuppressionEvent::TYPE_SUPPRESSED,
+            '2026-08-19 23:59:59',
+            Reasons::HARD_BOUNCE,
+            'scaleway',
+            'kurz-vor-zwoelf@example.com',
+        );
 
         $tag = new MetricQuery(Period::between(
             Carbon::parse('2026-08-19')->startOfDay(),
             Carbon::parse('2026-08-19')->endOfDay(),
         ));
 
-        $this->assertSame(2, (new Events)->value($tag), 'the event half a second before midnight is inside the day');
+        $this->assertSame(2, (new Events)->value($tag), 'the event in the last second of the day is inside the day');
         $this->assertSame(['2026-08-19' => 2], (new Events)->series($tag), "and it is in that day's column, not the next one");
     }
 
@@ -670,18 +685,22 @@ class InsightsMetricsTest extends TestCase
      * instant it asks about is the end of something, and every one of those is
      * 23:59:59.999999, so an address blocked in that last fraction was
      * reported by the event figure and missing from the holding beside it.
+     *
+     * At second precision the two comparisons agree on this row, so this test
+     * states the agreement rather than catching its absence: an address blocked
+     * inside the day has to still be on the list at the close of it.
      */
     #[Test]
-    public function an_address_blocked_in_the_last_fraction_of_the_final_second_is_on_the_list_at_the_close(): void
+    public function an_address_blocked_in_the_final_second_is_on_the_list_at_the_close(): void
     {
-        $this->rawBlock('kurz-vor-zwoelf@example.com', suppressedAt: '2026-08-19 23:59:59.500');
+        $this->block('kurz-vor-zwoelf@example.com', Reasons::HARD_BOUNCE, suppressedAt: '2026-08-19 23:59:59');
 
         $tag = new MetricQuery(Period::between(
             Carbon::parse('2026-08-19')->startOfDay(),
             Carbon::parse('2026-08-19')->endOfDay(),
         ));
 
-        $this->assertSame(1, (new Blocked)->value($tag), 'blocked half a second before midnight is blocked at the close of that day');
+        $this->assertSame(1, (new Blocked)->value($tag), 'blocked in the last second of a day is blocked at the close of that day');
         $this->assertSame(['2026-08-19' => 1], (new Blocked)->series($tag), "and the day's column has to agree with the headline");
     }
 
@@ -690,15 +709,21 @@ class InsightsMetricsTest extends TestCase
      *
      * The mirror of the case above, and the one that reads as an over-count:
      * compared inclusively, an address released — or a temporary block lapsing
-     * — in the final fraction was still on the list at the close. Two rows,
+     * — in the closing second was still on the list at the close. Two rows,
      * because the two ways off the list are two separate conditions and a
      * repair to one is not a repair to the other.
+     *
+     * This is the one of the three that still fails against the old form, and it
+     * does so at second precision: {@see Blocked::rowsBlockedAt()} asks
+     * `released_at >= justAfter(T)`, and a departure at exactly T is inside the
+     * old inclusive `>= T` and outside the half-open `>= T + 1s`. Nothing about
+     * it depends on a fraction the columns cannot hold.
      */
     #[Test]
-    public function an_address_leaving_in_the_last_fraction_of_the_final_second_is_off_the_list_at_the_close(): void
+    public function an_address_leaving_in_the_final_second_is_off_the_list_at_the_close(): void
     {
-        $this->rawBlock('freigegeben@example.com', suppressedAt: '2026-08-18 09:00:00', releasedAt: '2026-08-19 23:59:59.500');
-        $this->rawBlock('abgelaufen@example.com', suppressedAt: '2026-08-18 09:00:00', expiresAt: '2026-08-19 23:59:59.500');
+        $this->block('freigegeben@example.com', Reasons::HARD_BOUNCE, suppressedAt: '2026-08-18 09:00:00', releasedAt: '2026-08-19 23:59:59');
+        $this->block('abgelaufen@example.com', Reasons::HARD_BOUNCE, suppressedAt: '2026-08-18 09:00:00', expiresAt: '2026-08-19 23:59:59');
 
         $fenster = new MetricQuery(Period::between(
             Carbon::parse('2026-08-18')->startOfDay(),
@@ -711,37 +736,6 @@ class InsightsMetricsTest extends TestCase
             (new Blocked)->series($fenster),
             'both are on the list through the 18th and off it by the end of the 19th, which is a level of zero and therefore no column',
         );
-    }
-
-    /**
-     * One row written straight to the table, so a sub-second timestamp survives.
-     *
-     * {@see block()} goes through the model, which is the right way to build a
-     * fixture and the wrong way to state these two cases: the `datetime` cast
-     * formats to whole seconds and the fraction would be gone before it reached
-     * the database.
-     */
-    protected function rawBlock(
-        string $email,
-        string $suppressedAt,
-        ?string $expiresAt = null,
-        ?string $releasedAt = null,
-        int $brandId = Reasons::GLOBAL_BRAND_ID,
-    ): void {
-        DB::table('suppressions')->insert([
-            'uuid' => (string) Str::uuid(),
-            'brand_id' => $brandId,
-            'email_normalized' => $email,
-            'reason' => Reasons::HARD_BOUNCE,
-            'source' => 'scaleway',
-            'suppressed_at' => $suppressedAt,
-            'expires_at' => $expiresAt,
-            'released_at' => $releasedAt,
-            'released_by' => $releasedAt === null ? null : 'adrian',
-            'release_reason' => $releasedAt === null ? null : 'Der Empfänger hat sich selbst wieder angemeldet.',
-            'created_at' => $suppressedAt,
-            'updated_at' => $suppressedAt,
-        ]);
     }
 
     // -- Across brands --------------------------------------------------------
