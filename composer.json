@@ -57,7 +57,7 @@
             "description": "Global, brand-aware suppression: one answer to whether an address may be mailed.",
             "url": "https://github.com/goldnead/statamic-suppression",
             "developer": "Adrian Goldner",
-            "developer-url": "https://gldnr.studio"
+            "developer-url": "https://adriangoldner.dev"
         },
         "laravel": {
             "providers": [
