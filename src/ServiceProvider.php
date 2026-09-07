@@ -2,14 +2,17 @@
 
 namespace Goldnead\Suppression;
 
+use Goldnead\BrandContext\Settings\SettingsRegistry;
 use Goldnead\Suppression\Console\ReleaseCommand;
 use Goldnead\Suppression\Console\SuppressCommand;
 use Goldnead\Suppression\Contracts\Gate;
 use Goldnead\Suppression\Gate\DatabaseGate;
 use Goldnead\Suppression\Integrations\Insights\Blocked;
 use Goldnead\Suppression\Integrations\Insights\Events;
+use Goldnead\Suppression\Support\Settings;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\ServiceProvider as BaseServiceProvider;
+use Statamic\Facades\Permission;
 use Throwable;
 
 /**
@@ -47,6 +50,16 @@ class ServiceProvider extends BaseServiceProvider
         // package that has no Control Panel surface at all.
         $this->loadTranslationsFrom(__DIR__.'/../resources/lang', 'suppression');
 
+        // Die geteilte Einstellungsseite. Sie ist der einzige
+        // Control-Panel-Auftritt, den dieses Paket je bekommt, und er gehört
+        // ihm nicht: Seite, Formular und Speicher stehen in brand-context,
+        // hier steht nur die Feldliste. Der Grund steht in der Config beim
+        // Schwellenwert — der Wert soll nachjustiert werden, und bis jetzt
+        // ging das nur über einen Deploy.
+        $this->app->make(SettingsRegistry::class)->register(Settings::class);
+
+        $this->registerSettingsPermission();
+
         $this->registerInsightsMetrics();
 
         $this->publishes([
@@ -67,6 +80,30 @@ class ServiceProvider extends BaseServiceProvider
                 ReleaseCommand::class,
             ]);
         }
+    }
+
+    /**
+     * Das Recht, das den Abschnitt dieses Pakets auf der geteilten
+     * Einstellungsseite freigibt.
+     *
+     * Hinter `class_exists`, wie jede andere Verbindung dieses Pakets nach
+     * draußen: `statamic/cms` ist ein `suggest`, kein `require`, und dieses
+     * Paket bootet in einem Queue-Worker und in fremden Testbetten, wo es die
+     * Fassade nicht gibt. Ohne Statamic gibt es kein Control Panel, also auch
+     * kein Recht zu vergeben — das ist kein Fehler, sondern der Normalfall.
+     */
+    protected function registerSettingsPermission(): void
+    {
+        if (! class_exists(Permission::class)) {
+            return;
+        }
+
+        Permission::extend(function (): void {
+            Permission::group('suppression', __('suppression::settings.permission_group'), function (): void {
+                Permission::register('manage suppression settings')
+                    ->label(__('suppression::settings.permission_manage'));
+            });
+        });
     }
 
     /**
