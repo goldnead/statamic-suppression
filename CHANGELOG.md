@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.1 — 2026-11-16
+
+### Changed
+
+- The package download no longer contains `art/` and `MARKETPLACE.md` (`export-ignore`). No code change, no migration, no new config key.
+
 ## 1.2.1 — 2026-09-03
 
 ### Fixed: the last second of a period is inside the "blocked" figure
