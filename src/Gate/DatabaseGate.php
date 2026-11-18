@@ -92,6 +92,7 @@ class DatabaseGate implements Gate
      * would quietly fall back to the default brand and miss every other brand's
      * rows. Fail closed: look at all brands, so a block anywhere counts.
      */
+    /** @return Builder<Suppression> */
     private function scoped(?int $brandId): Builder
     {
         if ($this->lacksBrandContext($brandId)) {
