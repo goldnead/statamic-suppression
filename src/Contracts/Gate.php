@@ -28,7 +28,7 @@ interface Gate
     /**
      * May this address be mailed in this brand?
      *
-     * @param  int|null  $brandId  null resolves the current brand.
+     * @param  int|null  $brandId  null resolves the current brand. In multi-brand mode without a current brand, all brands are consulted (fail closed).
      *
      * @throws SuppressionCheckFailed when the answer cannot be established.
      */
@@ -39,7 +39,7 @@ interface Gate
      * address — the form an audience loop needs.
      *
      * @param  iterable<mixed>  $emails
-     * @return array<string, true> keyed by normalized email
+     * @return array<string, true> keyed by normalized email. Unusable entries (empty, non-string) are included as suppressed, keyed by their trimmed input; look up only with `EmailNormalizer::normalize`.
      *
      * @throws SuppressionCheckFailed when the answer cannot be established.
      */

@@ -6,6 +6,8 @@ use Goldnead\Suppression\Contracts\Gate;
 use Goldnead\Suppression\Exceptions\SuppressionCheckFailed;
 use Goldnead\Suppression\Models\Suppression;
 use Goldnead\Suppression\Support\EmailNormalizer;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
@@ -32,11 +34,14 @@ class DatabaseGate implements Gate
         }
 
         try {
-            return Suppression::query()
-                ->visibleTo($brandId)
+            $suppressed = $this->scoped($brandId)
                 ->active()
                 ->forEmail($normalized)
                 ->exists();
+
+            $this->logUnscoped($brandId, 1, $suppressed ? 1 : 0);
+
+            return $suppressed;
         } catch (Throwable $e) {
             throw SuppressionCheckFailed::from($e);
         }
@@ -44,17 +49,31 @@ class DatabaseGate implements Gate
 
     public function suppressedAmong(iterable $emails, ?int $brandId = null): array
     {
-        $normalized = EmailNormalizer::normalizeMany($emails);
+        $normalized = [];
+        $unusable = [];
+
+        foreach ($emails as $email) {
+            $value = is_string($email) ? EmailNormalizer::normalize($email) : null;
+
+            if ($value !== null) {
+                $normalized[$value] = true;
+            } else {
+                // Same answer as isSuppressed(): nothing to look up, so no
+                // permission. Keyed by what was passed, as far as it is a string.
+                $unusable[is_string($email) ? trim($email) : '(invalid:'.get_debug_type($email).')'] = true;
+            }
+        }
+
+        $normalized = array_keys($normalized);
 
         if ($normalized === []) {
-            return [];
+            return $unusable;
         }
 
         try {
             // One query per batch, not one per recipient. The chunked audience
             // loop this feeds used to run a lookup per subscriber.
-            $hits = Suppression::query()
-                ->visibleTo($brandId)
+            $hits = $this->scoped($brandId)
                 ->active()
                 ->whereIn('email_normalized', $normalized)
                 ->pluck('email_normalized')
@@ -63,6 +82,45 @@ class DatabaseGate implements Gate
             throw SuppressionCheckFailed::from($e);
         }
 
-        return array_fill_keys($hits, true);
+        $this->logUnscoped($brandId, count($normalized), count($hits));
+
+        return array_fill_keys($hits, true) + $unusable;
+    }
+
+    /**
+     * Without a brand id and without a current brand (multi-brand), `visibleTo`
+     * would quietly fall back to the default brand and miss every other brand's
+     * rows. Fail closed: look at all brands, so a block anywhere counts.
+     */
+    private function scoped(?int $brandId): Builder
+    {
+        if ($this->lacksBrandContext($brandId)) {
+            return Suppression::query();
+        }
+
+        return Suppression::query()->visibleTo($brandId);
+    }
+
+    private function lacksBrandContext(?int $brandId): bool
+    {
+        if ($brandId !== null) {
+            return false;
+        }
+
+        $context = app('brand-context');
+
+        return $context->multiBrandEnabled() && ! $context->hasCurrent();
+    }
+
+    private function logUnscoped(?int $brandId, int $checked, int $suppressed): void
+    {
+        if (! $this->lacksBrandContext($brandId)) {
+            return;
+        }
+
+        Log::warning('statamic-suppression: gate checked without brand context, all brands were consulted.', [
+            'checked' => $checked,
+            'suppressed' => $suppressed,
+        ]);
     }
 }
