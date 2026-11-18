@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.4.0 — 2026-11-18
+
+### Changed
+
+- **The gate fails closed without a brand context.** In multi-brand mode with no current brand and no `$brandId`, `isSuppressed()` and the batch check now consult all brands, so a block anywhere counts. Before, the default brand was consulted and the blocks of every other brand were missed. Each such check logs one warning with the number checked and blocked.
+- The batch check treats unusable entries (empty, non-string) as suppressed, keyed by their trimmed input, the same answer as `isSuppressed()`. Look up with `EmailNormalizer::normalize()`.
+
+### Upgrading
+
+- No migration, no new config key.
+
 ## 1.3.1 — 2026-11-16
 
 ### Changed
