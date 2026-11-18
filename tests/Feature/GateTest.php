@@ -93,6 +93,31 @@ it('throws rather than answering "nobody is suppressed" when it cannot ask', fun
 it('refuses an address it cannot even normalise', function (): void {
     // Nothing to look up, so there is no basis for permission. Refusing is the
     // closed answer; returning false would be the open one.
-    expect(app(Gate::class)->isSuppressed('   '))->toBeTrue()
-        ->and(app(Gate::class)->suppressedAmong(['  ', null, 5]))->toBe([]);
+    expect(app(Gate::class)->isSuppressed('   '))->toBeTrue();
+});
+
+it('reports unusable batch entries as suppressed, like the single check does', function (): void {
+    $hits = app(Gate::class)->suppressedAmong(['  ', null, 5, 'fine@example.test']);
+
+    // Three entries cannot be mailed. Dropping them silently would read as
+    // "not in the result, so sendable".
+    expect($hits)->toHaveCount(3)
+        ->and($hits)->not->toHaveKey('fine@example.test')
+        ->and(array_values(array_unique($hits)))->toBe([true]);
+});
+
+it('checks every brand when no brand is current in multi-brand mode', function (): void {
+    $this->enableMultiBrand();
+    $this->makeBrand('brand-a');
+    $this->makeBrand('brand-b');
+
+    $this->inBrand('brand-b', fn () => app(SuppressionService::class)
+        ->suppress('b-only@example.test', Reasons::MANUAL, ['brand_id' => app('brand-context')->currentId()]));
+
+    expect(app('brand-context')->hasCurrent())->toBeFalse()
+        // No brand context: the row of brand B must not be missed.
+        ->and(app(Gate::class)->isSuppressed('b-only@example.test'))->toBeTrue()
+        ->and(app(Gate::class)->suppressedAmong(['b-only@example.test']))->toHaveKey('b-only@example.test')
+        // A known brand keeps its precise answer.
+        ->and(app(Gate::class)->isSuppressed('b-only@example.test', $this->makeBrand('brand-a')->id))->toBeFalse();
 });
