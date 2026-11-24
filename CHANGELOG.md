@@ -8,7 +8,7 @@
 
 ### Fixed
 
-- `suppression:release` looked at the first row for the address in any state. An old released global row sorted ahead of an active brand complaint, so `--force` on that complaint failed. `SuppressionService::find()` takes `activeOnly: true` (default stays `false`); the command uses it.
+- `suppression:release` looked at the first row for the address in any state. An old released global row sorted ahead of an active brand complaint, so `--force` on that complaint failed. `SuppressionService::find()` takes `activeOnly: true` (default stays `false`); the command uses it. `release()` and `releaseComplaint()` now pick from the same active rows, so an expired, unreleased row is no longer found ("No active suppression"); it never blocked a send.
 
 ## 1.4.0 — 2026-11-18
 

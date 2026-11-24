@@ -432,7 +432,9 @@ class SuppressionService
         $suppression = Suppression::query()
             ->visibleTo($brandId)
             ->forEmail($normalized)
-            ->whereNull('released_at')
+            // Same rows `find(activeOnly: true)` sees, so the console command
+            // and the release it triggers can never pick two different rows.
+            ->active()
             ->orderBy('brand_id')
             ->first();
 

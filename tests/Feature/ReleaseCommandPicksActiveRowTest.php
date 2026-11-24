@@ -45,3 +45,23 @@ it('find() can be limited to rows that block right now', function (): void {
     expect($service->find('both@example.test', $this->brandId)->brand_id)->toBe(Reasons::GLOBAL_BRAND_ID)
         ->and($service->find('both@example.test', $this->brandId, activeOnly: true)->brand_id)->toBe($this->brandId);
 });
+
+it('does not release an expired global row in place of the active complaint', function (): void {
+    $service = app(SuppressionService::class);
+    $service->suppress('lapsed@example.test', Reasons::HARD_BOUNCE, ['expires_at' => now()->subDay()]);
+    $service->suppress('lapsed@example.test', Reasons::COMPLAINT, ['brand_id' => $this->brandId]);
+
+    $this->artisan('suppression:release', [
+        '--email' => 'lapsed@example.test',
+        '--brand' => $this->brandId,
+        '--force' => true,
+        '--actor' => 'user:7',
+        '--reason' => 'Written re-consent on file, ticket 1183, checked by Adrian.',
+    ])->assertSuccessful();
+
+    $complaint = Suppression::query()->where('email_normalized', 'lapsed@example.test')->where('brand_id', $this->brandId)->sole();
+    $expired = Suppression::query()->where('email_normalized', 'lapsed@example.test')->where('brand_id', Reasons::GLOBAL_BRAND_ID)->sole();
+
+    expect($complaint->released_at)->not->toBeNull()
+        ->and($expired->released_at)->toBeNull();
+});
