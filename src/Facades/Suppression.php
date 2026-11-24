@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Facade;
  * @method static \Goldnead\Suppression\Models\Suppression releaseComplaint(string $email, string $actor, string $reason, ?int $brandId = null, array $context = [])
  * @method static \Goldnead\Suppression\Models\Suppression|null recordSoftBounce(string $email, array $attributes = [])
  * @method static void recordDelivery(string $email, array $attributes = [])
- * @method static \Goldnead\Suppression\Models\Suppression|null find(string $email, ?int $brandId = null)
+ * @method static \Goldnead\Suppression\Models\Suppression|null find(string $email, ?int $brandId = null, bool $activeOnly = false)
  * @method static \Illuminate\Support\Collection historyFor(string $email, ?int $brandId = null)
  * @method static int brandIdFor(string $reason, ?int $brandId = null)
  *
