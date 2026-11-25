@@ -5,8 +5,11 @@
 ### Changed
 
 - **Breaking risk, multi-brand only: a brand-scoped suppression without a brand throws.** `suppress()` (and `brandIdFor()`) with a brand-scoped reason such as `complaint`, no `brand_id` and no current brand now throws `MissingBrandContext`. Before, the row landed silently in the default brand: the complaint of brand B blocked brand A, and brand B kept mailing the person. Global reasons (hard bounce, soft-bounce threshold) are unaffected, and so is every single-brand installation. Callers in a queue job or console run: pass `brand_id`, or wrap in `BrandContext::runFor()` / `RunsForEachBrand`.
+- **Breaking risk, multi-brand only: `Suppression::scopeVisibleTo(null)` throws without a current brand.** Same error class as above. It used to fall back to the default brand and show that brand's rows as everyone's. This reaches `find()`, `historyFor()`, `release()` and `releaseComplaint()` when called without `$brandId` outside a brand context: pass the brand id or run inside `BrandContext::runFor()`. `SuppressionEvent::scopeVisibleTo()` behaves the same. `release()` and `releaseComplaint()` now throw `MissingBrandContext` (a `RuntimeException`) where they threw `InvalidArgumentException` ("No active suppression") before; `suppression:release` without `--brand` prints "Pass --brand" and fails. The gate is unaffected (it already fails closed over all brands). Single-brand installations are unaffected.
 
 ### Fixed
+
+- `suppress()` resolved the brand before the dedupe check. A redelivered provider event without a brand threw `MissingBrandContext` instead of returning the existing row. The dedupe check now runs first and returns the row the original event wrote (its own scope, not the first visible row).
 
 - `suppression:release` looked at the first row for the address in any state. An old released global row sorted ahead of an active brand complaint, so `--force` on that complaint failed. `SuppressionService::find()` takes `activeOnly: true` (default stays `false`); the command uses it. `release()` and `releaseComplaint()` now pick from the same active rows, so an expired, unreleased row is no longer found ("No active suppression"); it never blocked a send.
 

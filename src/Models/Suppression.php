@@ -2,6 +2,7 @@
 
 namespace Goldnead\Suppression\Models;
 
+use Goldnead\Suppression\Exceptions\MissingBrandContext;
 use Goldnead\Suppression\Reasons;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -73,11 +74,21 @@ class Suppression extends Model
      * Rows a given brand may see: the global ones plus its own.
      *
      * Passing null resolves the current brand. In single-brand mode that is the
-     * default brand, which is harmless — global rows are visible either way.
+     * default brand, which is harmless — global rows are visible either way. In
+     * a multi-brand installation with no brand current it throws: falling back
+     * to the default brand would show one brand's rows as everyone's.
+     *
+     * @throws MissingBrandContext
      */
     public function scopeVisibleTo(Builder $query, ?int $brandId = null): Builder
     {
-        $brandId ??= app('brand-context')->currentId();
+        if ($brandId === null) {
+            if (! app('brand-context')->hasCurrent()) {
+                throw MissingBrandContext::forVisibility();
+            }
+
+            $brandId = (int) app('brand-context')->currentId();
+        }
 
         return $query->whereIn(
             $this->getTable().'.brand_id',

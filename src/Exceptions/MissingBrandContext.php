@@ -22,4 +22,12 @@ class MissingBrandContext extends RuntimeException
             'Pass `brand_id`, or run inside BrandContext::runFor() / the RunsForEachBrand trait.'
         );
     }
+
+    public static function forVisibility(): self
+    {
+        return new self(
+            'Visibility is brand-scoped, but no brand is current and none was passed. '.
+            'Pass a brand id, or run inside BrandContext::runFor() / the RunsForEachBrand trait.'
+        );
+    }
 }

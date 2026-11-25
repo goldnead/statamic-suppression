@@ -16,7 +16,7 @@ beforeEach(function (): void {
     $service = app(SuppressionService::class);
 
     $service->suppress('both@example.test', Reasons::HARD_BOUNCE);
-    $service->release('both@example.test', ['actor' => 'user:1', 'reason' => 'Mailbox is back, checked.']);
+    $service->release('both@example.test', ['actor' => 'user:1', 'reason' => 'Mailbox is back, checked.'], $this->brandId);
     $service->suppress('both@example.test', Reasons::COMPLAINT, ['brand_id' => $this->brandId]);
 });
 

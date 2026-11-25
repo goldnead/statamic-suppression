@@ -59,8 +59,6 @@ class SuppressionService
             throw new InvalidArgumentException('Cannot suppress an empty address.');
         }
 
-        $brandId = $this->brandIdFor($reason, $attributes['brand_id'] ?? null);
-
         $eventType = $attributes['event_type'] ?? SuppressionEvent::TYPE_SUPPRESSED;
 
         $dedupeKey = SuppressionEvent::dedupeKeyFor(
@@ -74,9 +72,17 @@ class SuppressionService
         // Redelivery of the same provider event must change nothing at all —
         // not the row, not the count of events. Checked before the transaction
         // so a duplicate costs one indexed read.
-        if ($dedupeKey !== null && SuppressionEvent::query()->where('dedupe_key', $dedupeKey)->exists()) {
-            return $this->find($normalized, $brandId);
+        // The brand is resolved only after this check: a redelivery must hand
+        // back the row the original event wrote, even when the redelivery
+        // carries no brand and none is current (which would throw below).
+        if ($dedupeKey !== null && ($seen = SuppressionEvent::query()->where('dedupe_key', $dedupeKey)->first()) !== null) {
+            return Suppression::query()
+                ->where('brand_id', $seen->brand_id)
+                ->forEmail($normalized)
+                ->first();
         }
+
+        $brandId = $this->brandIdFor($reason, $attributes['brand_id'] ?? null);
 
         return DB::transaction(function () use ($normalized, $reason, $brandId, $attributes, $eventType, $dedupeKey) {
             $suppression = Suppression::query()->firstOrNew([
