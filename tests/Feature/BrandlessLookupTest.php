@@ -33,6 +33,25 @@ it('keeps visibleTo(null) working in single-brand mode', function (): void {
     expect(Suppression::query()->visibleTo(null)->count())->toBe(1);
 });
 
+it('refuses find(), historyFor() and release() without a brand in multi-brand mode', function (): void {
+    $this->enableMultiBrand();
+    $this->makeBrand('brand-a');
+    $service = app(SuppressionService::class);
+
+    expect(fn () => $service->find('x@example.test'))->toThrow(MissingBrandContext::class);
+    expect(fn () => $service->historyFor('x@example.test'))->toThrow(MissingBrandContext::class);
+    expect(fn () => $service->release('x@example.test'))->toThrow(MissingBrandContext::class);
+});
+
+it('suppression:release reports a missing brand instead of crashing in multi-brand mode', function (): void {
+    $this->enableMultiBrand();
+    $this->makeBrand('brand-a');
+
+    $this->artisan('suppression:release', ['--email' => 'x@example.test'])
+        ->expectsOutputToContain('Pass --brand')
+        ->assertFailed();
+});
+
 it('returns the existing row for a redelivered provider event even without a brand', function (): void {
     $this->enableMultiBrand();
     $brand = $this->makeBrand('brand-a');

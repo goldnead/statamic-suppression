@@ -2,6 +2,7 @@
 
 namespace Goldnead\Suppression\Models;
 
+use Goldnead\Suppression\Exceptions\MissingBrandContext;
 use Goldnead\Suppression\Reasons;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -76,7 +77,13 @@ class SuppressionEvent extends Model
 
     public function scopeVisibleTo(Builder $query, ?int $brandId = null): Builder
     {
-        $brandId ??= app('brand-context')->currentId();
+        if ($brandId === null) {
+            if (! app('brand-context')->hasCurrent()) {
+                throw MissingBrandContext::forVisibility();
+            }
+
+            $brandId = (int) app('brand-context')->currentId();
+        }
 
         return $query->whereIn(
             $this->getTable().'.brand_id',

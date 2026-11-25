@@ -3,6 +3,7 @@
 namespace Goldnead\Suppression\Console;
 
 use Goldnead\Suppression\Exceptions\ComplaintReleaseRefused;
+use Goldnead\Suppression\Exceptions\MissingBrandContext;
 use Goldnead\Suppression\Reasons;
 use Goldnead\Suppression\SuppressionService;
 use Illuminate\Console\Command;
@@ -39,7 +40,14 @@ class ReleaseCommand extends Command
         }
 
         $brandId = $this->option('brand') !== null ? (int) $this->option('brand') : null;
-        $existing = $suppressions->find($email, $brandId, activeOnly: true);
+
+        try {
+            $existing = $suppressions->find($email, $brandId, activeOnly: true);
+        } catch (MissingBrandContext) {
+            $this->error('Several brands are configured and none is current. Pass --brand.');
+
+            return self::FAILURE;
+        }
 
         if (! $existing) {
             $this->error("No suppression found for [{$email}].");
