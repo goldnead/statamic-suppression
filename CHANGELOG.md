@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- **Breaking risk, multi-brand only: a brand-scoped suppression without a brand throws.** `suppress()` (and `brandIdFor()`) with a brand-scoped reason such as `complaint`, no `brand_id` and no current brand now throws `MissingBrandContext`. Before, the row landed silently in the default brand: the complaint of brand B blocked brand A, and brand B kept mailing the person. Global reasons (hard bounce, soft-bounce threshold) are unaffected, and so is every single-brand installation. Callers in a queue job or console run: pass `brand_id`, or wrap in `BrandContext::runFor()` / `RunsForEachBrand`.
+
+### Fixed
+
+- `suppression:release` looked at the first row for the address in any state. An old released global row sorted ahead of an active brand complaint, so `--force` on that complaint failed. `SuppressionService::find()` takes `activeOnly: true` (default stays `false`); the command uses it. `release()` and `releaseComplaint()` now pick from the same active rows, so an expired, unreleased row is no longer found ("No active suppression"); it never blocked a send.
+
 ## 1.4.0 — 2026-11-18
 
 ### Changed

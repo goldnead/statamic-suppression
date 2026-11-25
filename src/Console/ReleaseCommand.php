@@ -39,7 +39,7 @@ class ReleaseCommand extends Command
         }
 
         $brandId = $this->option('brand') !== null ? (int) $this->option('brand') : null;
-        $existing = $suppressions->find($email, $brandId);
+        $existing = $suppressions->find($email, $brandId, activeOnly: true);
 
         if (! $existing) {
             $this->error("No suppression found for [{$email}].");

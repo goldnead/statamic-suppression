@@ -4,6 +4,7 @@ namespace Goldnead\Suppression;
 
 use Goldnead\Suppression\Exceptions\ComplaintReleaseRefused;
 use Goldnead\Suppression\Exceptions\IncompleteAuditTrail;
+use Goldnead\Suppression\Exceptions\MissingBrandContext;
 use Goldnead\Suppression\Models\Suppression;
 use Goldnead\Suppression\Models\SuppressionEvent;
 use Goldnead\Suppression\Support\EmailNormalizer;
@@ -259,10 +260,28 @@ class SuppressionService
             return Reasons::GLOBAL_BRAND_ID;
         }
 
-        return $brandId ?? (int) app('brand-context')->currentId();
+        if ($brandId !== null) {
+            return $brandId;
+        }
+
+        // `hasCurrent()` is always true in single-brand mode, so only a
+        // multi-brand installation with nothing resolved gets here.
+        if (! app('brand-context')->hasCurrent()) {
+            throw MissingBrandContext::forReason($reason);
+        }
+
+        return (int) app('brand-context')->currentId();
     }
 
-    public function find(string $email, ?int $brandId = null): ?Suppression
+    /**
+     * The first row for an address in the scopes visible to the brand.
+     *
+     * By default any row, released or expired included: that is what a history
+     * view wants. Pass `activeOnly` to ask what blocks right now — an old
+     * released global row would otherwise sort ahead of (and hide) an active
+     * brand row, because the lookup orders by `brand_id`.
+     */
+    public function find(string $email, ?int $brandId = null, bool $activeOnly = false): ?Suppression
     {
         $normalized = EmailNormalizer::normalize($email);
 
@@ -273,6 +292,7 @@ class SuppressionService
         return Suppression::query()
             ->visibleTo($brandId)
             ->forEmail($normalized)
+            ->when($activeOnly, fn ($query) => $query->active())
             ->orderBy('brand_id')
             ->first();
     }
@@ -412,7 +432,9 @@ class SuppressionService
         $suppression = Suppression::query()
             ->visibleTo($brandId)
             ->forEmail($normalized)
-            ->whereNull('released_at')
+            // Same rows `find(activeOnly: true)` sees, so the console command
+            // and the release it triggers can never pick two different rows.
+            ->active()
             ->orderBy('brand_id')
             ->first();
 
